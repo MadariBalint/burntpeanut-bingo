@@ -148,6 +148,14 @@ export default function App() {
 
     const hasWon = checkWinner(updatedBoard);
 
+    setPlayers((currentPlayers) =>
+      currentPlayers.map((currentPlayer) =>
+        currentPlayer.id === player.id
+          ? { ...currentPlayer, board: updatedBoard, has_won: hasWon }
+          : currentPlayer,
+      ),
+    );
+
     const { error: playerError } = await supabase
       .from("game_players")
       .update({
@@ -157,6 +165,11 @@ export default function App() {
       .eq("id", player.id);
 
     if (playerError) {
+      setPlayers((currentPlayers) =>
+        currentPlayers.map((currentPlayer) =>
+          currentPlayer.id === player.id ? player : currentPlayer,
+        ),
+      );
       setError(playerError.message);
       return;
     }
