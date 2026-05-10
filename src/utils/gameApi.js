@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { createBoard } from "./bingo";
-import { playAgainVote } from "./playAgain";
+import { hasPlayAgainVote, noPlayAgainVote, playAgainVote } from "./playAgain";
 
 export async function getPhrases() {
   const { data, error } = await supabase.from("bingo_phrases").select("*");
@@ -37,6 +37,7 @@ export async function createGameForPlayer(playerName) {
       player_name: playerName,
       board: createBoard(phrases),
       marked: [],
+      voted: noPlayAgainVote,
     })
     .select()
     .single();
@@ -72,6 +73,7 @@ export async function joinGameForPlayer(gameId, playerName) {
       player_name: playerName,
       board: createBoard(phrases),
       marked: [],
+      voted: noPlayAgainVote,
     })
     .select()
     .single();
@@ -173,7 +175,7 @@ export async function deleteGameById(gameId) {
 export async function votePlayAgainForPlayer(playerId) {
   const { error } = await supabase
     .from("game_players")
-    .update({ marked: playAgainVote })
+    .update({ voted: playAgainVote })
     .eq("id", playerId);
 
   return { error: error?.message };
@@ -209,7 +211,7 @@ export async function startNextRoundForGame(gameId) {
     return { error: playersFetchError.message };
   }
 
-  if (!currentPlayers.every((player) => player.marked?.includes(playAgainVote[0]))) {
+  if (!currentPlayers.every(hasPlayAgainVote)) {
     return {};
   }
 
@@ -221,6 +223,7 @@ export async function startNextRoundForGame(gameId) {
           board: createBoard(phrases),
           has_won: false,
           marked: [],
+          voted: noPlayAgainVote,
         })
         .eq("id", player.id),
     ),

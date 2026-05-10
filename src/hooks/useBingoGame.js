@@ -1,8 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "../lib/supabase";
 import { checkWinner } from "../utils/bingo";
 import {
   createGameForPlayer,
   deleteGameById,
+  fetchSavedGameAndPlayer,
   joinGameForPlayer,
   loadPlayersByGameId,
   startNextRoundForGame,
@@ -11,15 +13,12 @@ import {
   votePlayAgainForPlayer,
 } from "../utils/gameApi";
 import {
+  clearSavedSession,
   getSavedSession,
   resetGameSession,
   saveSession,
 } from "../utils/gameSession";
 import { hasPlayAgainVote, playAgainVote } from "../utils/playAgain";
-import { useCopyFeedback } from "./useCopyFeedback";
-import { useGameRealtime } from "./useGameRealtime";
-import { useLatestRefs } from "./useLatestRefs";
-import { useRestoreGameSession } from "./useRestoreGameSession";
 
 export function useBingoGame() {
   const [game, setGame] = useState(null);
@@ -27,15 +26,11 @@ export function useBingoGame() {
   const [currentPlayerId, setCurrentPlayerId] = useState(null);
   const [error, setError] = useState("");
   const [dismissedWinner, setDismissedWinner] = useState(null);
+  const [copiedGameId, setCopiedGameId] = useState("");
   const [isStartingNextRound, setIsStartingNextRound] = useState(false);
   const [isRestoringSession, setIsRestoringSession] = useState(() =>
     Boolean(getSavedSession()?.gameId),
   );
-  const {
-    copiedValue: copiedGameId,
-    copyValue,
-    resetCopiedValue,
-  } = useCopyFeedback(setError);
 
   const currentPlayerIdRef = useRef(null);
   const gameRef = useRef(null);
@@ -163,7 +158,7 @@ export function useBingoGame() {
     setGame(updatedGame);
   }
 
-  async function startNextRound() {
+  const startNextRound = useCallback(async () => {
     if (!game?.id || !game.winner || isStartingNextRound) return;
 
     setIsStartingNextRound(true);
@@ -187,16 +182,13 @@ export function useBingoGame() {
     } finally {
       setIsStartingNextRound(false);
     }
-  }
+  }, [game, isStartingNextRound, loadPlayers]);
 
-  useLatestRefs({
-    currentPlayerId,
-    currentPlayerIdRef,
-    game,
-    gameRef,
-    startNextRound,
-    startNextRoundRef,
-  });
+  useEffect(() => {
+    currentPlayerIdRef.current = currentPlayerId;
+    gameRef.current = game;
+    startNextRoundRef.current = startNextRound;
+  }, [currentPlayerId, game, startNextRound]);
 
   async function votePlayAgain() {
     const player = players.find(
@@ -210,7 +202,7 @@ export function useBingoGame() {
     setPlayers((currentPlayers) =>
       currentPlayers.map((currentPlayer) =>
         currentPlayer.id === player.id
-          ? { ...currentPlayer, marked: playAgainVote }
+          ? { ...currentPlayer, voted: playAgainVote }
           : currentPlayer,
       ),
     );
@@ -227,8 +219,17 @@ export function useBingoGame() {
     }
   }
 
-  function copyGameId() {
-    copyValue(game.id);
+  async function copyGameId() {
+    try {
+      await navigator.clipboard.writeText(game.id);
+      setCopiedGameId(game.id);
+
+      window.setTimeout(() => {
+        setCopiedGameId("");
+      }, 2000);
+    } catch {
+      setError("Could not copy the Game ID.");
+    }
   }
 
   async function deleteGameAndReturnToLobby() {
@@ -253,25 +254,103 @@ export function useBingoGame() {
     setPlayers(resetStateValues.players);
     setCurrentPlayerId(resetStateValues.currentPlayerId);
     setDismissedWinner(resetStateValues.dismissedWinner);
-    resetCopiedValue();
-  }, [resetCopiedValue]);
+    setCopiedGameId("");
+  }, []);
 
-  useRestoreGameSession({
-    onError: setError,
-    setCurrentPlayerId,
-    setGame,
-    setIsRestoringSession,
-  });
+  useEffect(() => {
+    const savedSession = getSavedSession();
 
-  useGameRealtime({
-    currentPlayerIdRef,
-    game,
-    gameRef,
-    loadPlayers,
-    onGameDeleted: resetState,
-    setGame,
-    startNextRoundRef,
-  });
+    if (!savedSession?.gameId || !savedSession?.playerId) return;
+
+    let isActive = true;
+
+    async function restoreSession() {
+      const {
+        game: savedGame,
+        player: savedPlayer,
+        error: restoreError,
+      } = await fetchSavedGameAndPlayer(savedSession);
+
+      if (!isActive) return;
+
+      if (restoreError) {
+        clearSavedSession();
+        setError(restoreError);
+        setIsRestoringSession(false);
+        return;
+      }
+
+      setGame(savedGame);
+      setCurrentPlayerId(savedPlayer.id);
+      setIsRestoringSession(false);
+    }
+
+    restoreSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!game?.id) return;
+
+    async function loadInitialPlayers() {
+      await loadPlayers(game.id);
+    }
+
+    loadInitialPlayers();
+
+    const channel = supabase
+      .channel(`game-${game.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "game_players",
+          filter: `game_id=eq.${game.id}`,
+        },
+        async () => {
+          const updatedPlayers = await loadPlayers(game.id);
+          const latestGame = gameRef.current;
+          const player = updatedPlayers?.find(
+            (currentPlayer) => currentPlayer.id === currentPlayerIdRef.current,
+          );
+
+          if (
+            latestGame?.winner &&
+            player?.player_name === latestGame.player1_name &&
+            updatedPlayers.length >= 2 &&
+            updatedPlayers.every(hasPlayAgainVote)
+          ) {
+            startNextRoundRef.current?.();
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "games",
+          filter: `id=eq.${game.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            resetState();
+            return;
+          }
+
+          setGame(payload.new);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [game?.id, loadPlayers, resetState]);
 
   return {
     copiedGameId,
