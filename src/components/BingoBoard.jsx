@@ -8,7 +8,7 @@ function BingoBoard({
   onToggleCell,
 }) {
   return (
-    <div className="grid w-full grid-cols-5 gap-2 sm:gap-3">
+    <div className="grid w-full grid-cols-5 gap-1.5 sm:gap-2 md:gap-3">
       {board.map((cell, index) => (
         <BingoCell
           key={`${cell.id}-${index}`}

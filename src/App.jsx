@@ -26,7 +26,7 @@ export default function App() {
 
   if (isRestoringSession) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-center text-white">
+      <div className="flex min-h-dvh items-center justify-center bg-zinc-950 px-4 text-center text-white sm:px-6">
         <p className="font-semibold text-zinc-300">Loading your game...</p>
       </div>
     );
@@ -34,7 +34,7 @@ export default function App() {
 
   if (!game) {
     return (
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-dvh bg-zinc-950">
         <GameLobby onCreateGame={createGame} onJoinGame={joinGame} />
 
         {error && (
@@ -45,15 +45,19 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-8 text-center text-white">
-      <h1 className="mb-4 text-4xl font-bold">TheBurntPeanut Bingo</h1>
+    <main className="min-h-dvh bg-zinc-950 px-3 py-4 text-center text-white sm:px-6 sm:py-8">
+      <h1 className="mb-3 text-3xl font-bold sm:mb-4 sm:text-4xl">
+        TheBurntPeanut Bingo
+      </h1>
 
-      <div className="mb-6 flex flex-wrap items-center justify-center gap-2 text-zinc-300">
-        <span>Share this Game ID:</span>
-        <strong className="break-all text-yellow-400">{game.id}</strong>
+      <div className="mx-auto mb-4 flex max-w-xl items-center justify-center gap-2 text-sm text-zinc-300 sm:mb-6 sm:text-base">
+        <span className="shrink-0">Game ID:</span>
+        <strong className="min-w-0 flex-1 truncate text-left text-yellow-400 sm:flex-none sm:break-all">
+          {game.id}
+        </strong>
         <button
           aria-label={copiedGameId === game.id ? "Game ID copied" : "Copy Game ID"}
-          className="inline-flex size-10 items-center justify-center rounded-lg bg-zinc-800 text-white transition hover:bg-zinc-700"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-white transition hover:bg-zinc-700"
           onClick={copyGameId}
           title={copiedGameId === game.id ? "Copied" : "Copy Game ID"}
           type="button"
@@ -86,17 +90,19 @@ export default function App() {
       </div>
 
       {game.winner && (
-        <p className="mb-6 font-semibold text-yellow-300">Game finished</p>
+        <p className="mb-4 font-semibold text-yellow-300 sm:mb-6">
+          Game finished
+        </p>
       )}
 
       {error && <p className="mb-4 font-semibold text-red-400">{error}</p>}
 
-      <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
-        <span className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 font-bold text-zinc-200">
+      <div className="mb-4 flex flex-wrap items-center justify-center gap-2 sm:mb-6 sm:gap-3">
+        <span className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold text-zinc-200 sm:px-4 sm:text-base">
           Round {game.round_number ?? 1}
         </span>
         <button
-          className="rounded-lg border border-red-400/60 bg-red-500/10 px-4 py-2 font-bold text-red-300 transition hover:bg-red-500/20"
+          className="rounded-lg border border-red-400/60 bg-red-500/10 px-3 py-2 text-sm font-bold text-red-300 transition hover:bg-red-500/20 sm:px-4 sm:text-base"
           onClick={deleteGameAndReturnToLobby}
           type="button"
         >
@@ -122,7 +128,7 @@ export default function App() {
 
       {copiedGameId === game.id && (
         <div
-          className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-lg border border-yellow-300/40 bg-zinc-900 px-4 py-3 font-semibold text-yellow-300 shadow-xl"
+          className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-xs -translate-x-1/2 rounded-lg border border-yellow-300/40 bg-zinc-900 px-4 py-3 font-semibold text-yellow-300 shadow-xl sm:bottom-6"
           role="status"
         >
           Game ID copied

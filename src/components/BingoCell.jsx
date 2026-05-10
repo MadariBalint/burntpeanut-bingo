@@ -19,7 +19,7 @@ function BingoCell({ cell, opponentMarks, playerColor, onClick }) {
 
   return (
     <button
-      className={`aspect-square min-h-16 rounded-lg border-2 p-1 text-[10px] leading-tight transition sm:min-h-24 sm:p-2 sm:text-xs ${statusClasses}
+      className={`aspect-square min-h-0 rounded-md border p-1 text-[clamp(0.46rem,2.15vw,0.75rem)] leading-tight transition sm:rounded-lg sm:border-2 sm:p-2 md:text-xs ${statusClasses}
         ${cell.free ? "cursor-not-allowed" : "cursor-pointer"}`}
       onClick={onClick}
       disabled={cell.free}

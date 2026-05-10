@@ -26,9 +26,9 @@ function PlayerBoard({ game, players, currentPlayerId, onToggleCell }) {
   const playerColor = getPlayerColor(player, game);
 
   return (
-    <section className="mx-auto w-full max-w-xl">
-      <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-        <h2 className="min-w-0 text-right text-xl font-bold">
+    <section className="mx-auto w-full max-w-[min(100%,38rem)]">
+      <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:mb-4 sm:gap-3">
+        <h2 className="min-w-0 text-right text-base font-bold sm:text-xl">
           <span className={playerNameColorClasses.blue}>
             {player1Name} ({player1Score})
           </span>{" "}
@@ -37,12 +37,12 @@ function PlayerBoard({ game, players, currentPlayerId, onToggleCell }) {
           ) : null}
         </h2>
 
-        <span className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
+        <span className="text-xs font-semibold uppercase text-zinc-400 sm:text-sm">
           vs
         </span>
 
         <div className="min-w-0 text-left">
-          <h2 className="text-xl font-bold">
+          <h2 className="text-base font-bold sm:text-xl">
             <span className={playerNameColorClasses.red}>
               {player2Name} ({player2Score})
             </span>{" "}
