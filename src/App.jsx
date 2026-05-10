@@ -1,233 +1,36 @@
-import { useEffect, useState } from "react";
-import { supabase } from "./lib/supabase";
-import { createBoard, checkWinner } from "./utils/bingo";
 import GameLobby from "./components/GameLobby";
 import PlayerBoard from "./components/PlayerBoard";
+import WinnerModal from "./components/WinnerModal";
+import { useBingoGame } from "./hooks/useBingoGame";
+import { hasPlayAgainVote } from "./utils/playAgain";
 
 export default function App() {
-  const [game, setGame] = useState(null);
-  const [players, setPlayers] = useState([]);
-  const [currentPlayerId, setCurrentPlayerId] = useState(null);
-  const [error, setError] = useState("");
+  const {
+    copiedGameId,
+    copyGameId,
+    createGame,
+    currentPlayerId,
+    deleteGameAndReturnToLobby,
+    dismissedWinner,
+    error,
+    game,
+    isRestoringSession,
+    joinGame,
+    players,
+    setDismissedWinner,
+    toggleCell,
+    votePlayAgain,
+  } = useBingoGame();
 
-  async function getPhrases() {
-    const { data, error } = await supabase.from("bingo_phrases").select("*");
-    if (error) throw error;
-    return data;
-  }
+  const currentPlayer = players.find((player) => player.id === currentPlayerId);
 
-  async function createGame(playerName) {
-    setError("");
-
-    if (!playerName.trim()) {
-      setError("Enter your name first.");
-      return;
-    }
-
-    const phrases = await getPhrases();
-
-    if (phrases.length < 24) {
-      setError("Add at least 24 phrases in Supabase.");
-      return;
-    }
-
-    const { data: newGame, error: gameError } = await supabase
-      .from("games")
-      .insert({
-        player1_name: playerName,
-      })
-      .select()
-      .single();
-
-    if (gameError) {
-      setError(gameError.message);
-      return;
-    }
-
-    const board = createBoard(phrases);
-
-    const { data: player, error: playerError } = await supabase
-      .from("game_players")
-      .insert({
-        game_id: newGame.id,
-        player_name: playerName,
-        board,
-        marked: [],
-      })
-      .select()
-      .single();
-
-    if (playerError) {
-      setError(playerError.message);
-      return;
-    }
-
-    setGame(newGame);
-    setCurrentPlayerId(player.id);
-    loadPlayers(newGame.id);
-  }
-
-  async function joinGame(gameId, playerName) {
-    setError("");
-
-    if (!gameId.trim() || !playerName.trim()) {
-      setError("Enter game ID and your name.");
-      return;
-    }
-
-    const phrases = await getPhrases();
-
-    if (phrases.length < 24) {
-      setError("Add at least 24 phrases in Supabase.");
-      return;
-    }
-
-    const { data: foundGame, error: gameError } = await supabase
-      .from("games")
-      .select("*")
-      .eq("id", gameId)
-      .single();
-
-    if (gameError) {
-      setError("Game not found.");
-      return;
-    }
-
-    const board = createBoard(phrases);
-
-    const { data: player, error: playerError } = await supabase
-      .from("game_players")
-      .insert({
-        game_id: foundGame.id,
-        player_name: playerName,
-        board,
-        marked: [],
-      })
-      .select()
-      .single();
-
-    if (playerError) {
-      setError(playerError.message);
-      return;
-    }
-
-    const { data: updatedGame } = await supabase
-      .from("games")
-      .update({ player2_name: playerName })
-      .eq("id", foundGame.id)
-      .select()
-      .single();
-
-    setGame(updatedGame || foundGame);
-    setCurrentPlayerId(player.id);
-    loadPlayers(foundGame.id);
-  }
-
-  async function loadPlayers(gameId) {
-    const { data, error } = await supabase
-      .from("game_players")
-      .select("*")
-      .eq("game_id", gameId);
-
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
-    setPlayers(data);
-  }
-
-  async function toggleCell(index) {
-    const player = players.find((p) => p.id === currentPlayerId);
-
-    if (!player || player.has_won || game?.winner) return;
-
-    const updatedBoard = player.board.map((cell, i) =>
-      i === index && !cell.free ? { ...cell, marked: !cell.marked } : cell,
+  if (isRestoringSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-center text-white">
+        <p className="font-semibold text-zinc-300">Loading your game...</p>
+      </div>
     );
-
-    const hasWon = checkWinner(updatedBoard);
-
-    setPlayers((currentPlayers) =>
-      currentPlayers.map((currentPlayer) =>
-        currentPlayer.id === player.id
-          ? { ...currentPlayer, board: updatedBoard, has_won: hasWon }
-          : currentPlayer,
-      ),
-    );
-
-    const { error: playerError } = await supabase
-      .from("game_players")
-      .update({
-        board: updatedBoard,
-        has_won: hasWon,
-      })
-      .eq("id", player.id);
-
-    if (playerError) {
-      setPlayers((currentPlayers) =>
-        currentPlayers.map((currentPlayer) =>
-          currentPlayer.id === player.id ? player : currentPlayer,
-        ),
-      );
-      setError(playerError.message);
-      return;
-    }
-
-    if (hasWon) {
-      const { data: updatedGame, error: gameError } = await supabase
-        .from("games")
-        .update({ winner: player.player_name })
-        .eq("id", game.id)
-        .select()
-        .single();
-
-      if (gameError) {
-        setError(gameError.message);
-        return;
-      }
-
-      setGame(updatedGame);
-    }
   }
-
-  useEffect(() => {
-    if (!game?.id) return;
-
-    loadPlayers(game.id);
-
-    const channel = supabase
-      .channel(`game-${game.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "game_players",
-          filter: `game_id=eq.${game.id}`,
-        },
-        () => {
-          loadPlayers(game.id);
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "games",
-          filter: `id=eq.${game.id}`,
-        },
-        (payload) => {
-          setGame(payload.new);
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [game?.id]);
 
   if (!game) {
     return (
@@ -245,29 +48,86 @@ export default function App() {
     <main className="min-h-screen bg-zinc-950 px-6 py-8 text-center text-white">
       <h1 className="mb-4 text-4xl font-bold">TheBurntPeanut Bingo</h1>
 
-      <p className="mb-6 text-zinc-300">
-        Share this Game ID:
-        <strong className="ml-2 break-all text-yellow-400">{game.id}</strong>
-      </p>
+      <div className="mb-6 flex flex-wrap items-center justify-center gap-2 text-zinc-300">
+        <span>Share this Game ID:</span>
+        <strong className="break-all text-yellow-400">{game.id}</strong>
+        <button
+          aria-label={copiedGameId === game.id ? "Game ID copied" : "Copy Game ID"}
+          className="inline-flex size-10 items-center justify-center rounded-lg bg-zinc-800 text-white transition hover:bg-zinc-700"
+          onClick={copyGameId}
+          title={copiedGameId === game.id ? "Copied" : "Copy Game ID"}
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            className={copiedGameId === game.id ? "text-yellow-300" : ""}
+            fill="none"
+            height="20"
+            viewBox="0 0 24 24"
+            width="20"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M8 8H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+            />
+            <path
+              d="M10 4h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+            />
+          </svg>
+        </button>
+      </div>
 
       {game.winner && (
-        <h2 className="mb-6 text-3xl font-bold text-yellow-400">
-          Winner: {game.winner}
-        </h2>
+        <p className="mb-6 font-semibold text-yellow-300">Game finished</p>
       )}
 
       {error && <p className="mb-4 font-semibold text-red-400">{error}</p>}
 
-      <div className="flex flex-wrap justify-center gap-8">
-        {players.map((player) => (
-          <PlayerBoard
-            key={player.id}
-            player={player}
-            currentPlayerId={currentPlayerId}
-            onToggleCell={toggleCell}
-          />
-        ))}
+      <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
+        <span className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 font-bold text-zinc-200">
+          Round {game.round_number ?? 1}
+        </span>
+        <button
+          className="rounded-lg border border-red-400/60 bg-red-500/10 px-4 py-2 font-bold text-red-300 transition hover:bg-red-500/20"
+          onClick={deleteGameAndReturnToLobby}
+          type="button"
+        >
+          Return to Lobby
+        </button>
       </div>
+
+      <PlayerBoard
+        game={game}
+        players={players}
+        currentPlayerId={currentPlayerId}
+        onToggleCell={toggleCell}
+      />
+
+      {game.winner && dismissedWinner !== game.winner && (
+        <WinnerModal
+          game={game}
+          hasVoted={hasPlayAgainVote(currentPlayer)}
+          onClose={() => setDismissedWinner(game.winner)}
+          onPlayAgain={votePlayAgain}
+        />
+      )}
+
+      {copiedGameId === game.id && (
+        <div
+          className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-lg border border-yellow-300/40 bg-zinc-900 px-4 py-3 font-semibold text-yellow-300 shadow-xl"
+          role="status"
+        >
+          Game ID copied
+        </div>
+      )}
     </main>
   );
 }

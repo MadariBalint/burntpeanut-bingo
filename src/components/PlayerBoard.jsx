@@ -1,19 +1,66 @@
 import BingoBoard from "./BingoBoard";
 
-function PlayerBoard({ player, currentPlayerId, onToggleCell }) {
-  const isCurrentPlayer = player.id === currentPlayerId;
+function getPlayerColor(player, game) {
+  return player?.player_name === game?.player2_name ? "red" : "blue";
+}
+
+const playerNameColorClasses = {
+  blue: "text-sky-300",
+  red: "text-rose-300",
+};
+
+function PlayerBoard({ game, players, currentPlayerId, onToggleCell }) {
+  const player = players.find((currentPlayer) => currentPlayer.id === currentPlayerId);
+  const opponents = players.filter(
+    (currentPlayer) => currentPlayer.id !== currentPlayerId,
+  );
+  const player1Name = game?.player1_name || "Player 1";
+  const player2Name = game?.player2_name || "Waiting...";
+  const player1Score = game?.player1_score ?? 0;
+  const player2Score = game?.player2_score ?? 0;
+
+  if (!player) {
+    return <p className="text-zinc-300">Loading your board...</p>;
+  }
+
+  const playerColor = getPlayerColor(player, game);
 
   return (
-    <div>
-      <h2>
-        {player.player_name} {player.has_won ? "🏆" : ""}
-      </h2>
+    <section className="mx-auto w-full max-w-xl">
+      <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+        <h2 className="min-w-0 text-right text-xl font-bold">
+          <span className={playerNameColorClasses.blue}>
+            {player1Name} ({player1Score})
+          </span>{" "}
+          {game?.winner === player1Name ? (
+            <span className="text-yellow-300">Winner</span>
+          ) : null}
+        </h2>
+
+        <span className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
+          vs
+        </span>
+
+        <div className="min-w-0 text-left">
+          <h2 className="text-xl font-bold">
+            <span className={playerNameColorClasses.red}>
+              {player2Name} ({player2Score})
+            </span>{" "}
+            {game?.winner === player2Name ? (
+              <span className="text-yellow-300">Winner</span>
+            ) : null}
+          </h2>
+        </div>
+      </div>
 
       <BingoBoard
         board={player.board}
-        onToggleCell={isCurrentPlayer ? onToggleCell : () => {}}
+        opponents={opponents}
+        playerColor={playerColor}
+        getOpponentColor={(opponent) => getPlayerColor(opponent, game)}
+        onToggleCell={onToggleCell}
       />
-    </div>
+    </section>
   );
 }
 
