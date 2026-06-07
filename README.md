@@ -2,6 +2,8 @@
 
 A realtime two-player bingo game built with React, Vite, Tailwind CSS, and Supabase. Players create or join a shared game, mark squares on their own board, and race to complete a row, column, or diagonal.
 
+**Live demo:** https://burntpeanut-bingo.vercel.app/
+
 ## Features
 
 - Create a new game and share the generated Game ID
