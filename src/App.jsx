@@ -1,3 +1,4 @@
+import AppLogo from "./components/AppLogo";
 import GameLobby from "./components/GameLobby";
 import PlayerBoard from "./components/PlayerBoard";
 import WinnerModal from "./components/WinnerModal";
@@ -46,9 +47,7 @@ export default function App() {
 
   return (
     <main className="min-h-dvh bg-zinc-950 px-3 py-4 text-center text-white sm:px-6 sm:py-8">
-      <h1 className="mb-3 text-3xl font-bold sm:mb-4 sm:text-4xl">
-        TheBurntPeanut Bingo
-      </h1>
+      <AppLogo className="mb-3 sm:mb-4" />
 
       <div className="mx-auto mb-4 flex max-w-xl items-center justify-center gap-2 text-sm text-zinc-300 sm:mb-6 sm:text-base">
         <span className="shrink-0">Game ID:</span>
